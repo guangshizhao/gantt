@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="./vue.js"></script>
+    <script src="https://lib.baomitu.com/jquery/1.11.1/jquery.min.js"></script>
+ 
+    <!-- 引入elm组件库 -->
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <!-- 引入elm样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="./gantt.css">
+    <style>
+        *{box-sizing: border-box;margin: 0;padding: 0;}
+        body{
+            width: 1920px;
+            height: 1080px;
+            background: url(./bg.png) no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        ::-webkit-scrollbar {
+            width: 0.3rem;
+            height: 0.3rem;
+            /*background-image: linear-gradient(135deg, #1DE9B6 0%, rgba(8, 196, 219, 0.5) 72%, rgba(0, 182, 234, 0.3) 100%);*/
+            background-color: #002465;
+        }
+
+        ::-webkit-scrollbar-track {
+            border-radius: 0;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            border-radius: 0;
+            background-image: linear-gradient(135deg, #1DE9B6 0%, #08c4db 72%, #057494 100%);
+            /*background-color: #002465;*/
+            transition: all .2s;
+            border-radius: 0.3rem;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(95, 95, 95, 0.7);
+        }
+        .gantt-box{
+            position: relative;
+            /* margin: 0 auto; */
+        }
+        [v-cloak]{
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id='app' v-cloak>
+        <el-button @click='handleTab'>切换数据1</el-button>
+        <el-button @click='handleTab2'>切换数据2</el-button>
+        <div class="gantt-box">
+            <div class="gantt-box-left">
+                <div
+                    style="position: absolute;top: 0; height: 80px;background: linear-gradient(to left,#098BFA,#0E58BB);width: 80px;text-align: center;line-height: 80px;border: 1px solid #00bbee;">
+                    批次</div>
+                <aside v-for="(item,index) in ganttData" :key=`${index}_orderName`>
+                    {{item.name}}
+                </aside>
+            </div>
+            <div class="gantt-box-right">
+                <div class="gantt-right-head-box">
+                    <!--加4 是为了解决甘特图滚动到最右面背景竖线错位的问题 4px是滚动条的宽度-->
+                    <div class="gantt-head" :style="{width:ganttHeadWidth()+4+'px'}">
+                        <div v-for="(yearItem,yearIndex) in ganttTimeList" class="gantt-head-year"
+                            :key="`${yearIndex}_year1`">
+                            <div class="gantt-head-year-item">{{yearItem.year}}</div>
+                            <div class="gantt-head-mouth-box">
+                                <div v-for="(mouthItem,mouthIndex) in yearItem.mouthArr" class="gantt-head-mouth-item"
+                                    :key="`${mouthIndex}_mouth`">
+                                    <div>{{mouthItem.mouth}}月</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="gantt-right-main-box">
+                    <!--height: ganttData.length < 6 ? '100%' :''是为了解决批次少的情况,内容撑不起来导致背景线高度不够-->
+                    <div
+                        :style="{width:ganttHeadWidth()+'px',position: 'relative',height: ganttData.length < 6 ? '100%' :'' }">
+                        <div v-for="(item,index) in ganttData" class="gantt-mian-itme" :key="`${index}_ganttData1`">
+                            <div class="gantt-mian-item-bar-box"
+                                :style="{ marginLeft:ganttBarMargin(item),width:ganttBarWidth(item),height:'20px',border:'1px solid #0d8ddb',position:'relative' }">
+                                <el-tooltip placement="top">
+                                    <div slot="content">任务下达日期:<br />{{item.start}}</div>
+                                    <div class="bar-icon bar-box-icon">
+                                        <span>▲</span>
+                                        <div v-show="index==0">任务下达</div>
+                                    </div>
+                                </el-tooltip>
+
+                                <!--计划完成图标 -->
+                                <el-tooltip placement="top" v-for="(stepItem,stepIndex) in item.step"
+                                    :style="{left:ganttPlanIconLeft(item,stepItem),color:stepItem.color}"
+                                    v-if="stepItem.name!== '抽检试验'" :key="`${stepIndex}_PlanIcon`">
+                                    <div slot="content">计划{{stepItem.name}}日期:<br />{{stepItem.planEndTime}}</div>
+                                    <div class="plan-icon">
+                                        <div><i class="el-icon-location"
+                                                style="font-size: 20px;margin-left: -11px;"></i></div>
+                                        <div style="color:#fff" v-show="index==0"> <br />计划{{stepItem.name}}时间</div>
+                                    </div>
+                                </el-tooltip>
+
+                                <!--底部的三角标-->
+                                <div v-for="(stepItem,stepIndex) in item.step" :key="`${stepIndex}_stepItem1`"
+                                    :class="ganttBarClass(stepItem,stepIndex)"
+                                    :style="{width:ganttItemBarWidth(stepItem),position:'relative',background:stepItem.color}">
+
+                                    <el-tooltip placement="top" v-show="stepItem.status">
+                                        <div slot="content">
+                                            {{stepItem.name}}日期:<br />{{stepItem.endTime}}
+                                        </div>
+                                        <div class="bar-icon">
+                                            <span>▲</span>
+                                            <div v-show="index==0">{{stepItem.name}}</div>
+                                        </div>
+                                    </el-tooltip>
+                                </div>
+                            </div>
+                        </div>
+                        <!--背景分割线-->
+                        <div class="gantt-right-main-bg">
+                            <div :class="['gantt-right-main-bg-cell',{nowLine:nowLine(item)}]"
+                                v-for="(item,index) in ganttSplitLine" :key="index">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src='./index.js'></script>
+    <script>
+        /**
+         * 甘特图内容滚动用
+         * */
+        $(".gantt-right-main-box").scroll(function(){
+            var domsctop=$(".gantt-right-main-box").scrollTop();
+            var domscLeft=$(".gantt-right-main-box").scrollLeft();
+            $(".gantt-right-head-box").scrollLeft(domscLeft)
+            $(".gantt-box-left").scrollTop(domsctop)
+        });
+    
+        $(".gantt-right-main-box").scrollLeft(1386)
+    
+    </script>
+</body>
+
+</html>
